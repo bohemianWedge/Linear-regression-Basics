@@ -1,7 +1,7 @@
 import pandas as pd
-import math
 import json
 from Value import Value
+import matplotlib.pyplot as plt
 
 class linearReg:
         def __init__(self,learn_rate = 0.5 , target=0.1, max_iter=10000,a=Value(0), b=Value(0)):
@@ -36,21 +36,21 @@ class linearReg:
                 return cost
         
         def plot_cost_history(self, costs):
-                """Affiche l'évolution du coût pendant l'entraînement."""
-                import matplotlib.pyplot as plt
                 
                 plt.figure(figsize=(10, 5))
                 plt.plot(costs, color='blue', linewidth=1)
-                plt.xlabel('Itération')
-                plt.ylabel('Coût (MSE)')
-                plt.title('Évolution du coût pendant l\'entraînement')
+                plt.xlabel('Tteration')
+                plt.ylabel('Cost (MSE)')
+                plt.title('Cost evolution during training')
                 plt.grid(True, alpha=0.3)
                 plt.yscale('log')  # Échelle log pour mieux voir la convergence
-                plt.savefig('cost_history.png', dpi=150)
+                # plt.savefig('graph/cost_history.png', dpi=150)
                 plt.show()
 
         def fit(self):
                 costs = []
+                all_a = []
+                all_b = []
                 for i in range(self.max_iter):
                         act_y = self.compute_model()
                         cost = self.compute_cost(act_y)
@@ -60,23 +60,22 @@ class linearReg:
                         self.a.val = self.a.val - self.lr * self.a.grad
                         self.b.val = self.b.val - self.lr * self.b.grad
 
+                        all_a.append(self.a.val)
+                        all_b.append(self.b.val)
+                        
                         if i % 100 == 0: 
                                 print(i, cost.val, self.a.grad, self.b.grad)
 
                         if cost.val < self.target:
                                 break
 
-                        if abs(self.a.grad) < 1e-11 and abs(self.b.grad) < 1e-11:
+                        if abs(self.a.grad) < 1e-9 and abs(self.b.grad) < 1e-9:
                                 print(f"Convergence atteinte à l'itération {i}")
                                 break
-                self.plot_cost_history(costs)
+                self.save_training_history(all_a, all_b, costs)
+                return all_a, all_b, costs
 
         def denormalize(self):
-                """Convertit les paramètres normalisés en paramètres réels"""
-                # Si y_norm = a_norm * x_norm + b_norm
-                # Alors y = a_real * x + b_real
-                # Avec: a_real = a_norm * (price_std / km_std)
-                #       b_real = price_mean + price_std * (b_norm - a_norm * km_mean / km_std)
                 a_real = self.a.val * (self.price_std / self.km_std)
                 b_real = self.price_mean + self.price_std * self.b.val - a_real * self.km_mean
                 return a_real, b_real
@@ -85,10 +84,28 @@ class linearReg:
                 a_real, b_real = self.denormalize()
                 with open(filepath, 'w') as f:
                         json.dump({'theta0':b_real, 'theta1':a_real}, f)
-                print(f"Parametres sauvegardés dans {filepath}")
+                print(f"Params saved as {filepath}")
+
+        def save_training_history(self, all_a, all_b, costs):
+                all_a = [(a * self.price_std) / self.km_std for a in all_a]
+                all_b = [
+                self.price_mean + self.price_std * b - all_a[i] * self.km_mean 
+                for i, b in enumerate(all_b)
+                ]
+
+                costs = [cost * (self.price_std ** 2) for cost in costs]
+                history = {
+                        'iterations': list(range(len(all_a))),
+                        'a_values': all_a,
+                        'b_values': all_b,
+                        'costs': costs,
+                }
+                with open('training_history.json', 'w') as f:
+                        json.dump(history, f)
+                print("History saved as training_history.json")
 
 if __name__ == '__main__':
-        model = linearReg(learn_rate=0.1, target=0.001, max_iter=10000)
+        model = linearReg(learn_rate=0.1, target=0.1, max_iter=100)
         model.fit()
         model.save_model()
         

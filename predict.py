@@ -2,12 +2,12 @@ import json
 import pandas as pd
 import matplotlib.pyplot as plt
 
-
 def predict():
         try:
                 with open('model.json', 'r') as f:
                         params = json.load(f)
         except FileNotFoundError:
+                print("Error: Model not trained ! \"python train.py\"")
                 params = {'theta0': 0, 'theta1': 0}
         
         km = float(input("Kilométrage : "))
